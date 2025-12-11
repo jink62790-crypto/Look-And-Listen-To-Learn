@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Copy of LinguaSync",
+  "name": "New of LinguaSync",
   "description": "An advanced English audio-text synchronization learning tool powered by Gemini 2.5. Import audio, auto-transcribe with high accuracy, and study with interactive synced text.",
   "requestFramePermissions": [
     "microphone"
