@@ -39,11 +39,16 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       let msg = err.message || "An unexpected error occurred.";
-      if (msg.includes("API Key is missing")) {
+      const lowerMsg = msg.toLowerCase();
+      
+      if (lowerMsg.includes("api key is missing")) {
         msg = "API_KEY_MISSING";
-      } else if (msg.includes("internal error") || msg.includes("500") || msg.includes("503")) {
+      } else if (lowerMsg.includes("internal error") || lowerMsg.includes("500") || lowerMsg.includes("503") || lowerMsg.includes("service unavailable")) {
         msg = "SERVICE_UNAVAILABLE";
+      } else if (lowerMsg.includes("fetch failed") || lowerMsg.includes("network")) {
+        msg = "NETWORK_ERROR";
       }
+
       setErrorDetails(msg);
       setAppState(AppState.ERROR);
     }
@@ -125,6 +130,7 @@ const App: React.FC = () => {
           <div className="h-full flex flex-col items-center justify-center space-y-4 px-6">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
             <p className="text-slate-500 font-medium">Analyzing audio...</p>
+            <p className="text-xs text-slate-400">This may take up to 30 seconds.</p>
           </div>
         )}
 
@@ -152,18 +158,25 @@ const App: React.FC = () => {
                 <div>
                     <h3 className="text-lg font-bold text-slate-800">AI Service Busy</h3>
                     <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-                        Google's AI service is temporarily overloaded (Internal Error).<br/>
-                        We tried automatically retrying but it failed.
+                        Google's AI service is currently overloaded (500 Error).<br/>
+                        We automatically retried 3 times but it failed.
                     </p>
                     <p className="text-xs text-slate-400 mt-2">
-                        Please wait a moment and try again.
+                        Please wait 1 minute and try again.
+                    </p>
+                </div>
+            ) : errorDetails === "NETWORK_ERROR" ? (
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Network Error</h3>
+                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                        Cannot connect to Google's servers. Please check your internet connection.
                     </p>
                 </div>
             ) : (
                 <div>
                     <h3 className="text-lg font-bold text-slate-800">Analysis Failed</h3>
-                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-                        {errorDetails || "An unknown error occurred while processing the audio."}
+                    <p className="text-slate-500 text-sm mt-2 leading-relaxed break-words">
+                        {errorDetails || "An unknown error occurred."}
                     </p>
                 </div>
             )}

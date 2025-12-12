@@ -25,7 +25,10 @@ const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): 
       return await fn();
     } catch (error: any) {
       lastError = error;
-      const isInternalError = error.message?.includes("internal error") || error.message?.includes("500") || error.message?.includes("503");
+      // Retry on 5xx server errors or "internal error" messages
+      const isInternalError = error.message?.toLowerCase().includes("internal error") || 
+                              error.message?.includes("500") || 
+                              error.message?.includes("503");
       
       if (isInternalError && i < retries - 1) {
         console.warn(`API call failed (attempt ${i + 1}/${retries}). Retrying in ${delayMs}ms...`, error);
