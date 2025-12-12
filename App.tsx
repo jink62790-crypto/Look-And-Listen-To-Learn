@@ -144,15 +144,17 @@ const App: React.FC = () => {
                 <div>
                     <h3 className="text-lg font-bold text-slate-800">Missing API Key</h3>
                     <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-                        Please configure Cloudflare Pages:
+                        The app was built without the API Key.
                     </p>
-                    <ol className="text-xs text-left text-slate-600 bg-slate-100 p-4 rounded-lg mt-3 space-y-2 list-decimal list-inside">
-                        <li>Go to <b>Cloudflare Dashboard</b></li>
-                        <li>Click project <b>Look-And-Listen-To-Learn</b></li>
-                        <li>Click <b>Settings</b> &gt; <b>Environment variables</b></li>
-                        <li>Add <b>API_KEY</b> with your Gemini key</li>
-                        <li>Redeploy the app</li>
-                    </ol>
+                    <div className="text-xs text-left text-slate-600 bg-slate-100 p-4 rounded-lg mt-3 border border-slate-200">
+                        <p className="font-bold mb-2">How to fix:</p>
+                        <ol className="space-y-1 list-decimal list-inside">
+                            <li>Go to <b>Cloudflare/Netlify Dashboard</b></li>
+                            <li>Ensure <b>API_KEY</b> is in Environment Variables</li>
+                            <li className="text-red-600 font-bold">Important: Trigger a NEW Deploy</li>
+                            <li className="pl-4 text-slate-500 italic">Adding a key does not update the live site automatically. You must rebuild.</li>
+                        </ol>
+                    </div>
                 </div>
             ) : errorDetails === "SERVICE_UNAVAILABLE" ? (
                 <div>
