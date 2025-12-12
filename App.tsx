@@ -130,7 +130,7 @@ const App: React.FC = () => {
                 </p>
                 <ol className="text-xs text-left text-slate-600 bg-slate-100 p-4 rounded-lg mt-3 space-y-2 list-decimal list-inside">
                     <li>Go to <b>Cloudflare Dashboard</b></li>
-                    <li>Click project <b>my-wep-new-learn-app</b></li>
+                    <li>Click project <b>Look-And-Listen-To-Learn</b></li>
                     <li>Click <b>Settings</b> &gt; <b>Environment variables</b></li>
                     <li>Add <b>API_KEY</b> with your Gemini key</li>
                     <li>Redeploy the app</li>
