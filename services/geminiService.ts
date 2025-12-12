@@ -16,6 +16,30 @@ const getAi = () => {
 };
 
 /**
+ * Helper to retry async functions (e.g., API calls)
+ */
+const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> => {
+  let lastError: any;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const isInternalError = error.message?.includes("internal error") || error.message?.includes("500") || error.message?.includes("503");
+      
+      if (isInternalError && i < retries - 1) {
+        console.warn(`API call failed (attempt ${i + 1}/${retries}). Retrying in ${delayMs}ms...`, error);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        delayMs *= 2; // Exponential backoff
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
+/**
  * DeepSeek Client Helper
  */
 const callDeepSeek = async (systemPrompt: string, userPrompt: string): Promise<string> => {
@@ -162,7 +186,7 @@ export const transcribeAudio = async (file: File): Promise<TranscriptionResponse
     required: ["language", "segments", "meta"],
   };
 
-  try {
+  return withRetry(async () => {
     const response = await getAi().models.generateContent({
       model: TRANSCRIPTION_MODEL,
       contents: {
@@ -189,12 +213,7 @@ export const transcribeAudio = async (file: File): Promise<TranscriptionResponse
       return parsed;
     }
     throw new Error("Empty response from Gemini");
-
-  } catch (error) {
-    console.error("Transcription failed:", error);
-    // We cannot fallback to DeepSeek here because it doesn't support Audio uploads.
-    throw error;
-  }
+  });
 };
 
 /**
@@ -202,7 +221,7 @@ export const transcribeAudio = async (file: File): Promise<TranscriptionResponse
  * NOTE: Strictly requires Gemini (Multimodal).
  */
 export const generateSpeech = async (text: string): Promise<string> => {
-  try {
+  return withRetry(async () => {
     const response = await getAi().models.generateContent({
       model: TTS_MODEL,
       contents: { parts: [{ text }] },
@@ -219,10 +238,7 @@ export const generateSpeech = async (text: string): Promise<string> => {
     const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (audioData) return audioData;
     throw new Error("No audio data returned");
-  } catch (error) {
-    console.error("TTS failed:", error);
-    throw error;
-  }
+  });
 };
 
 /**
@@ -249,7 +265,7 @@ export const scorePronunciation = async (userAudio: Blob, referenceText: string)
     required: ["score", "feedback", "accuracy"]
   };
 
-  try {
+  return withRetry(async () => {
     const response = await getAi().models.generateContent({
       model: TRANSCRIPTION_MODEL,
       contents: {
@@ -268,10 +284,7 @@ export const scorePronunciation = async (userAudio: Blob, referenceText: string)
       return JSON.parse(response.text) as PronunciationScore;
     }
     throw new Error("Scoring failed");
-  } catch (error) {
-    console.error("Scoring failed:", error);
-    throw error;
-  }
+  });
 };
 
 /**
@@ -294,13 +307,15 @@ export const getWordDefinition = async (word: string, contextSentence: string): 
         required: ["word", "definition", "example"],
     };
 
-    const response = await getAi().models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema }
+    return await withRetry(async () => {
+        const response = await getAi().models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: { responseMimeType: "application/json", responseSchema }
+        });
+        return JSON.parse(response.text!) as WordDefinition;
     });
     
-    return JSON.parse(response.text!) as WordDefinition;
   } catch (geminiError) {
       console.warn("Gemini definition failed, attempting DeepSeek fallback...", geminiError);
       

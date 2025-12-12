@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [transcription, setTranscription] = useState<TranscriptionResponse | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<'original' | 'notes' | 'favorites'>('original');
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -22,6 +23,7 @@ const App: React.FC = () => {
   const handleFileSelected = async (file: File) => {
     try {
       setAppState(AppState.PROCESSING);
+      setErrorDetails(null);
       const url = URL.createObjectURL(file);
       setAudioFile({
         name: file.name,
@@ -36,6 +38,13 @@ const App: React.FC = () => {
       setAppState(AppState.READY);
     } catch (err: any) {
       console.error(err);
+      let msg = err.message || "An unexpected error occurred.";
+      if (msg.includes("API Key is missing")) {
+        msg = "API_KEY_MISSING";
+      } else if (msg.includes("internal error") || msg.includes("500") || msg.includes("503")) {
+        msg = "SERVICE_UNAVAILABLE";
+      }
+      setErrorDetails(msg);
       setAppState(AppState.ERROR);
     }
   };
@@ -45,6 +54,7 @@ const App: React.FC = () => {
     setAudioFile(null);
     setTranscription(null);
     setCurrentTime(0);
+    setErrorDetails(null);
   };
 
   const handleToggleFavorite = (index: number) => {
@@ -123,19 +133,41 @@ const App: React.FC = () => {
             <div className="text-red-500 bg-red-100 p-4 rounded-full mx-auto">
                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
-            <div>
-                <h3 className="text-lg font-bold text-slate-800">Missing API Key</h3>
-                <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-                    Please configure Cloudflare Pages:
-                </p>
-                <ol className="text-xs text-left text-slate-600 bg-slate-100 p-4 rounded-lg mt-3 space-y-2 list-decimal list-inside">
-                    <li>Go to <b>Cloudflare Dashboard</b></li>
-                    <li>Click project <b>Look-And-Listen-To-Learn</b></li>
-                    <li>Click <b>Settings</b> &gt; <b>Environment variables</b></li>
-                    <li>Add <b>API_KEY</b> with your Gemini key</li>
-                    <li>Redeploy the app</li>
-                </ol>
-            </div>
+            
+            {errorDetails === "API_KEY_MISSING" ? (
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Missing API Key</h3>
+                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                        Please configure Cloudflare Pages:
+                    </p>
+                    <ol className="text-xs text-left text-slate-600 bg-slate-100 p-4 rounded-lg mt-3 space-y-2 list-decimal list-inside">
+                        <li>Go to <b>Cloudflare Dashboard</b></li>
+                        <li>Click project <b>Look-And-Listen-To-Learn</b></li>
+                        <li>Click <b>Settings</b> &gt; <b>Environment variables</b></li>
+                        <li>Add <b>API_KEY</b> with your Gemini key</li>
+                        <li>Redeploy the app</li>
+                    </ol>
+                </div>
+            ) : errorDetails === "SERVICE_UNAVAILABLE" ? (
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">AI Service Busy</h3>
+                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                        Google's AI service is temporarily overloaded (Internal Error).<br/>
+                        We tried automatically retrying but it failed.
+                    </p>
+                    <p className="text-xs text-slate-400 mt-2">
+                        Please wait a moment and try again.
+                    </p>
+                </div>
+            ) : (
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Analysis Failed</h3>
+                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                        {errorDetails || "An unknown error occurred while processing the audio."}
+                    </p>
+                </div>
+            )}
+
             <button onClick={handleReset} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-700 transition shadow-lg shadow-slate-200 w-full">
                 Try Again
             </button>
