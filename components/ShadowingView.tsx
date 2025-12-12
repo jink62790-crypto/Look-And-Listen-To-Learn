@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TranscriptionSegment, PronunciationScore } from '../types';
 import { AudioRecorder, playPcmData } from '../services/audioUtils';
 import { scorePronunciation, generateSpeech } from '../services/geminiService';

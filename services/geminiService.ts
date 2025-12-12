@@ -1,6 +1,15 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { TranscriptionResponse, WordDefinition, PronunciationScore, TranscriptionSegment } from "../types";
 
+// Fix for "Cannot find name 'process'" in TypeScript without node types
+declare const process: {
+  env: {
+    API_KEY?: string;
+    DEEPSEEK_API_KEY?: string;
+    [key: string]: string | undefined;
+  }
+};
+
 const TRANSCRIPTION_MODEL = "gemini-2.5-flash"; 
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
