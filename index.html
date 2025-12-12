@@ -4,33 +4,54 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LinguaSync - Audio Learning</title>
+    <!-- Tailwind CSS (CDN for simplicity) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Error Handler -->
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        console.error("Global Error:", message, error);
+        const root = document.getElementById('root');
+        // Only show error UI if React hasn't mounted
+        if (root && root.innerText.includes('Loading')) {
+           root.innerHTML = `
+            <div style="padding: 2rem; color: #ef4444; font-family: sans-serif; text-align: center;">
+              <h2 style="font-weight: bold; margin-bottom: 1rem;">Startup Error</h2>
+              <p>The application failed to start.</p>
+              <div style="background: #fef2f2; padding: 1rem; margin-top:1rem; text-align: left; font-size: 0.8rem; border: 1px solid #fee2e2;">
+                ${message}
+              </div>
+            </div>
+          `;
+        }
+      };
+      
+      // Polyfills for browser environment
+      window.process = window.process || { env: { NODE_ENV: 'production' } };
+    </script>
+    
     <style>
-      /* Custom scrollbar for transcript view */
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      /* Smooth scrolling behavior */
-      html {
-        scroll-behavior: smooth;
-      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      html { scroll-behavior: smooth; }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
-    "react/": "https://esm.sh/react@^19.2.1/",
-    "react": "https://esm.sh/react@^19.2.1",
-    "@google/genai": "https://esm.sh/@google/genai@^1.32.0"
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "vite": "https://esm.sh/vite@^7.2.7",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 </head>
   <body class="bg-slate-50 text-slate-900 font-sans antialiased h-screen overflow-hidden">
-    <div id="root" class="h-full w-full"></div>
+    <div id="root" class="h-full w-full flex flex-col items-center justify-center text-slate-400 gap-4">
+      <div class="animate-pulse text-lg font-medium">Loading LinguaSync...</div>
+    </div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

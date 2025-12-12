@@ -118,21 +118,36 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {appState === AppState.ERROR && (
+          <div className="h-full flex flex-col items-center justify-center space-y-6 px-6 text-center animate-fade-in-up">
+            <div className="text-red-500 bg-red-100 p-4 rounded-full mx-auto">
+               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <div>
+                <h3 className="text-lg font-bold text-slate-800">Missing API Key</h3>
+                <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                    Please configure Cloudflare Pages:
+                </p>
+                <ol className="text-xs text-left text-slate-600 bg-slate-100 p-4 rounded-lg mt-3 space-y-2 list-decimal list-inside">
+                    <li>Go to <b>Cloudflare Dashboard</b></li>
+                    <li>Click project <b>my-wep-new-learn-app</b></li>
+                    <li>Click <b>Settings</b> &gt; <b>Environment variables</b></li>
+                    <li>Add <b>API_KEY</b> with your Gemini key</li>
+                    <li>Redeploy the app</li>
+                </ol>
+            </div>
+            <button onClick={handleReset} className="px-6 py-2 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-700 transition shadow-lg shadow-slate-200 w-full">
+                Try Again
+            </button>
+          </div>
+        )}
+
         {appState === AppState.READY && transcription && audioFile && (
            activeTab === 'notes' ? (
                <div className="h-full flex items-center justify-center text-slate-400">
                    <p>No notes yet.</p>
                </div>
            ) : (
-              // For Original and Favorites, we use TranscriptView
-              // Note: If in Favorites, displayedSegments is filtered. 
-              // We pass the full transcription to 'onToggleFavorite' index lookups if we used global index,
-              // but here we map locally. We need to handle index alignment.
-              // Simplest approach: Pass "isFavoritesMode" to view or just the list.
-              // To support toggling correctly in filtered view, we need the original index.
-              // Let's modify how we map in TranscriptView or pass a handler that takes the *text* ID or similar.
-              // For now, let's just pass the segments. If we are in Favorites, we only pass favorite segments.
-              // The drawback is 'currentTime' highligting might not work if the playing segment is hidden.
               activeTab === 'favorites' && displayedSegments.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
                      <svg className="w-12 h-12 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
@@ -145,7 +160,6 @@ const App: React.FC = () => {
                     onSegmentClick={(time) => setCurrentTime(time)}
                     meta={transcription.meta}
                     onToggleFavorite={(segment) => {
-                        // Find index in original list
                         const idx = transcription.segments.indexOf(segment);
                         if (idx !== -1) handleToggleFavorite(idx);
                     }}

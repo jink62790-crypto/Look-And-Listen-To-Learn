@@ -1,10 +1,55 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { TranscriptionResponse, WordDefinition, PronunciationScore, TranscriptionSegment } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const TRANSCRIPTION_MODEL = "gemini-2.5-flash"; 
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
+
+/**
+ * Lazy initialization of the AI client.
+ */
+const getAi = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please check your deployment environment variables.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+/**
+ * DeepSeek Client Helper
+ */
+const callDeepSeek = async (systemPrompt: string, userPrompt: string): Promise<string> => {
+    const deepSeekKey = process.env.DEEPSEEK_API_KEY;
+    if (!deepSeekKey) {
+        throw new Error("DeepSeek API Key is missing");
+    }
+
+    console.log("[Fallback] Switching to DeepSeek API...");
+
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${deepSeekKey}`
+        },
+        body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            stream: false,
+            response_format: { type: 'json_object' } // DeepSeek supports JSON mode
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`DeepSeek API Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+};
 
 /**
  * Converts a File/Blob to Base64 string (without Data URI prefix).
@@ -14,7 +59,6 @@ const fileToBase64 = async (file: File | Blob): Promise<string> => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result as string;
-      // Remove "data:audio/xyz;base64," prefix
       const base64 = result.split(',')[1] || result;
       resolve(base64);
     };
@@ -24,11 +68,10 @@ const fileToBase64 = async (file: File | Blob): Promise<string> => {
 };
 
 /**
- * Post-processes segments to merge short "filler" segments into the next one.
- * e.g. ["Okay, now,", "I want to share..."] -> ["Okay, now, I want to share..."]
+ * Post-processes segments to merge short "filler" segments.
  */
 const mergeShortSegments = (segments: TranscriptionSegment[]): TranscriptionSegment[] => {
-  const MIN_WORDS = 4; // Threshold for a "short" segment
+  const MIN_WORDS = 4;
   const merged: TranscriptionSegment[] = [];
   
   if (segments.length === 0) return [];
@@ -40,15 +83,12 @@ const mergeShortSegments = (segments: TranscriptionSegment[]): TranscriptionSegm
     const currentWordCount = current.text.split(/\s+/).length;
     const duration = current.end - current.start;
 
-    // Merge if current is short AND duration is short (less than 2 seconds),
-    // This prevents merging a very slow emphatic "No!" unless it's really a throwaway filler.
     if (currentWordCount < MIN_WORDS && duration < 2.0) {
       current = {
         ...current,
         end: next.end,
         text: `${current.text} ${next.text}`,
         translation: `${current.translation} ${next.translation}`,
-        // Prefer the next segment's idiomatic expression as short fillers rarely have good ones
         idiomatic: next.idiomatic || current.idiomatic, 
       };
     } else {
@@ -61,7 +101,22 @@ const mergeShortSegments = (segments: TranscriptionSegment[]): TranscriptionSegm
 };
 
 /**
+ * Helper to parse JSON that might be wrapped in Markdown code blocks
+ */
+const cleanAndParseJson = <T>(text: string): T => {
+    try {
+        // Remove ```json and ``` wrap if present
+        const cleanText = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        return JSON.parse(cleanText) as T;
+    } catch (e) {
+        console.error("JSON Parse Error on text:", text);
+        throw new Error("Failed to parse AI response");
+    }
+};
+
+/**
  * Transcribes audio with Translation and Idiomatic Expressions.
+ * NOTE: Strictly requires Gemini (Multimodal). DeepSeek cannot handle audio files.
  */
 export const transcribeAudio = async (file: File): Promise<TranscriptionResponse> => {
   const base64Audio = await fileToBase64(file);
@@ -108,7 +163,7 @@ export const transcribeAudio = async (file: File): Promise<TranscriptionResponse
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: TRANSCRIPTION_MODEL,
       contents: {
         parts: [
@@ -130,7 +185,6 @@ export const transcribeAudio = async (file: File): Promise<TranscriptionResponse
 
     if (response.text) {
       const parsed = JSON.parse(response.text) as TranscriptionResponse;
-      // Client-side safeguard: Merge short segments if the model didn't do it perfectly
       parsed.segments = mergeShortSegments(parsed.segments);
       return parsed;
     }
@@ -138,23 +192,25 @@ export const transcribeAudio = async (file: File): Promise<TranscriptionResponse
 
   } catch (error) {
     console.error("Transcription failed:", error);
+    // We cannot fallback to DeepSeek here because it doesn't support Audio uploads.
     throw error;
   }
 };
 
 /**
- * Text-to-Speech for Idiomatic Expressions.
+ * Text-to-Speech.
+ * NOTE: Strictly requires Gemini (Multimodal).
  */
 export const generateSpeech = async (text: string): Promise<string> => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: TTS_MODEL,
       contents: { parts: [{ text }] },
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' }, // 'Kore', 'Puck', 'Fenrir', etc.
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, 
           },
         },
       },
@@ -171,6 +227,7 @@ export const generateSpeech = async (text: string): Promise<string> => {
 
 /**
  * Scores user pronunciation.
+ * NOTE: Strictly requires Gemini (Multimodal) to listen to user audio.
  */
 export const scorePronunciation = async (userAudio: Blob, referenceText: string): Promise<PronunciationScore> => {
   const base64Audio = await fileToBase64(userAudio);
@@ -193,7 +250,7 @@ export const scorePronunciation = async (userAudio: Blob, referenceText: string)
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: TRANSCRIPTION_MODEL,
       contents: {
         parts: [
@@ -217,25 +274,48 @@ export const scorePronunciation = async (userAudio: Blob, referenceText: string)
   }
 };
 
+/**
+ * Get Word Definition.
+ * STRATEGY: Try Gemini -> Fail -> Try DeepSeek.
+ */
 export const getWordDefinition = async (word: string, contextSentence: string): Promise<WordDefinition> => {
-  const prompt = `Define "${word}" in context: "${contextSentence}". JSON output.`;
+  const prompt = `Define "${word}" in context: "${contextSentence}". Return JSON with: word, definition (English), example, phonetic.`;
   
-  const responseSchema = {
-    type: Type.OBJECT,
-    properties: {
-      word: { type: Type.STRING },
-      definition: { type: Type.STRING },
-      example: { type: Type.STRING },
-      phonetic: { type: Type.STRING },
-    },
-    required: ["word", "definition", "example"],
-  };
+  // 1. Try Google Gemini First
+  try {
+    const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+        word: { type: Type.STRING },
+        definition: { type: Type.STRING },
+        example: { type: Type.STRING },
+        phonetic: { type: Type.STRING },
+        },
+        required: ["word", "definition", "example"],
+    };
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: { responseMimeType: "application/json", responseSchema }
-  });
-  
-  return JSON.parse(response.text!) as WordDefinition;
+    const response = await getAi().models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: { responseMimeType: "application/json", responseSchema }
+    });
+    
+    return JSON.parse(response.text!) as WordDefinition;
+  } catch (geminiError) {
+      console.warn("Gemini definition failed, attempting DeepSeek fallback...", geminiError);
+      
+      // 2. Fallback to DeepSeek if configured
+      if (process.env.DEEPSEEK_API_KEY) {
+          try {
+              const systemPrompt = "You are an English dictionary API. Output purely JSON.";
+              const responseText = await callDeepSeek(systemPrompt, prompt);
+              return cleanAndParseJson<WordDefinition>(responseText);
+          } catch (deepSeekError) {
+              console.error("DeepSeek fallback also failed:", deepSeekError);
+              throw deepSeekError; // Throw the DeepSeek error if both fail
+          }
+      }
+      
+      throw geminiError; // If no DeepSeek key, throw original error
+  }
 };
